@@ -18,8 +18,6 @@ st.markdown("""
 Model yang digunakan:
 
 - BiLSTM-CRF
-- FastText Embedding
-- Skema Label BILOU
 
 Model akan mengekstraksi aspek dan sentimen
 dari ulasan produk e-commerce.

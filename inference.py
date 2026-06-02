@@ -7,7 +7,7 @@ import torch.nn as nn
 from torchcrf import CRF
 
 # ==========================================
-# CONFIG (STREAMLIT SAFE)
+# CONFIG
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,7 +30,7 @@ with open(os.path.join(BASE_DIR, "metadata.json"), "r", encoding="utf-8") as f:
 best_params = metadata["best_params"]
 
 # ==========================================
-# LOAD EMBEDDINGS
+# EMBEDDINGS
 # ==========================================
 pretrained_embeddings = torch.load(
     os.path.join(BASE_DIR, "embedding_matrix.pt"),
@@ -41,7 +41,6 @@ pretrained_embeddings = torch.load(
 # MODEL
 # ==========================================
 class BiLSTM_CRF_Model(nn.Module):
-
     def __init__(self, vocab_size, hidden_dim, num_tags, pretrained_embeddings):
         super().__init__()
 
@@ -63,7 +62,6 @@ class BiLSTM_CRF_Model(nn.Module):
         )
 
         self.fc = nn.Linear(hidden_dim * 2, num_tags)
-
         self.crf = CRF(num_tags, batch_first=True)
 
     def forward(self, x, mask):
@@ -77,67 +75,68 @@ class BiLSTM_CRF_Model(nn.Module):
         emissions = self.forward(x, mask)
         return self.crf.decode(emissions, mask=mask)
 
+
 # ==========================================
-# LOAD MODEL WEIGHTS
+# LOAD MODEL
 # ==========================================
 model = BiLSTM_CRF_Model(
-    vocab_size=len(vocab_w2i),   # ✅ FIX HERE
+    vocab_size=len(vocab_w2i),
     hidden_dim=best_params["hidden_dim"],
     num_tags=len(tag2idx),
     pretrained_embeddings=pretrained_embeddings
 )
 
 model.load_state_dict(
-    torch.load(
-        os.path.join(BASE_DIR, "bilstm_crf.pt"),
-        map_location=DEVICE
-    )
+    torch.load(os.path.join(BASE_DIR, "bilstm_crf.pt"), map_location=DEVICE)
 )
 
 model.to(DEVICE)
 model.eval()
 
-print("✓ BiLSTM-CRF loaded successfully")
+print("✓ Model loaded")
 
 # ==========================================
-# PREPROCESS
+# TEXT CLEANING (FIXED VERSION)
 # ==========================================
-def clean_token(token_text):
-    text = str(token_text).strip()
-    if not text:
+def clean_token(token):
+    token = str(token).strip()
+    if not token:
         return None
 
-    text = re.sub(r"([.,!?;:])", r" \1 ", text)
-    text = re.sub(r"\s+", " ", text).strip()
+    # hanya normalisasi ringan
+    token = re.sub(r"\s+", " ", token)
+    return token
 
-    return text
-    
+
 def preprocess_text(text):
-    text = text.strip()
+    text = text.strip().lower()
     if not text:
         return []
 
-    tokens = []
-    for t in text.split():
-        cleaned = clean_token(t)
-        if cleaned:
-            tokens.extend(cleaned.split())
+    # split sederhana tapi stabil untuk Indo e-commerce
+    tokens = re.findall(r"\w+|[^\w\s]", text, re.UNICODE)
 
-    return tokens
+    cleaned = []
+    for t in tokens:
+        t = clean_token(t)
+        if t:
+            cleaned.append(t)
+
+    return cleaned
+
 
 # ==========================================
-# PREDICT LABELS
+# PREDICT
 # ==========================================
 def predict_labels(text):
-
     tokens = preprocess_text(text)
 
     if not tokens:
         return [], []
 
     encoded = [
-        vocab_w2i.get(token.lower(), vocab_w2i.get("[UNK]", 0))  # ✅ FIX HERE
-        for token in tokens
+        vocab_w2i.get(t, vocab_w2i.get("[UNK]", 0))
+        for t in tokens
     ]
 
     x = torch.tensor([encoded], dtype=torch.long).to(DEVICE)
@@ -146,29 +145,22 @@ def predict_labels(text):
     with torch.no_grad():
         decoded = model.decode(x, mask)[0]
 
-    labels = [idx2tag[idx] for idx in decoded]
+    labels = [idx2tag[i] for i in decoded]
 
     return tokens, labels
 
+
 # ==========================================
-# SPLIT LABEL
+# BILOU EXTRACTION
 # ==========================================
 def split_label(label):
     parts = label.split("_")
-
     if len(parts) == 1:
         return parts[0], "neutral"
+    return "_".join(parts[:-1]), parts[-1]
 
-    aspek = "_".join(parts[:-1])
-    sentimen = parts[-1]
 
-    return aspek, sentimen
-
-# ==========================================
-# EXTRACT ABSA
-# ==========================================
 def extract_joint_absa(tokens, labels):
-
     results = []
     current_tokens = []
     current_entity = None
@@ -201,15 +193,6 @@ def extract_joint_absa(tokens, labels):
             })
 
         elif prefix == "B":
-
-            if current_tokens:
-                aspek, sentimen = split_label(current_entity)
-                results.append({
-                    "frasa": " ".join(current_tokens),
-                    "aspek": aspek,
-                    "sentimen": sentimen
-                })
-
             current_tokens = [token]
             current_entity = entity
 
@@ -223,47 +206,16 @@ def extract_joint_absa(tokens, labels):
                     "aspek": aspek,
                     "sentimen": sentimen
                 })
-
                 current_tokens = []
                 current_entity = None
 
-    # leftover entity
-    if current_tokens:
-        aspek, sentimen = split_label(current_entity)
-        results.append({
-            "frasa": " ".join(current_tokens),
-            "aspek": aspek,
-            "sentimen": sentimen
-        })
-
     return results
 
-# ==========================================
-# MAIN PREDICT
-# ==========================================
+
 def predict(text):
-
     tokens, labels = predict_labels(text)
-
-    extracted = extract_joint_absa(tokens, labels)
-
     return {
         "tokens": tokens,
         "labels": labels,
-        "extracted": extracted
+        "extracted": extract_joint_absa(tokens, labels)
     }
-
-# ==========================================
-# TEST
-# ==========================================
-if __name__ == "__main__":
-
-    sample = "harga murah pengiriman cepat seller ramah"
-
-    result = predict(sample)
-
-    print("\nTOKENS:", result["tokens"])
-    print("\nLABELS:", result["labels"])
-    print("\nABSA:")
-    for item in result["extracted"]:
-        print(item)

@@ -1,9 +1,5 @@
 import streamlit as st
-
-from inference import (
-    predict_bilstm_crf,
-    extract_joint_absa
-)
+from inference import predict  # ✅ FIX: hanya ini yang benar
 
 # ==========================================
 # PAGE CONFIG
@@ -53,9 +49,12 @@ text = st.text_area(
 # ==========================================
 def show_result(text):
 
-    tokens, labels = predict_bilstm_crf(text)
+    # ✅ FIX: pakai predict() bukan 2 fungsi terpisah
+    result = predict(text)
 
-    extracted = extract_joint_absa(tokens, labels)
+    tokens = result["tokens"]
+    labels = result["labels"]
+    extracted = result["extracted"]
 
     if not extracted:
         st.warning("Tidak ada aspek terdeteksi.")
@@ -71,39 +70,27 @@ def show_result(text):
 
         if sentimen.lower() == "positive":
 
-            st.success(
-                f"""
+            st.success(f"""
 Frasa : {frasa}
-
 Aspek : {aspek}
-
 Sentimen : {sentimen}
-"""
-            )
+""")
 
         elif sentimen.lower() == "negative":
 
-            st.error(
-                f"""
+            st.error(f"""
 Frasa : {frasa}
-
 Aspek : {aspek}
-
 Sentimen : {sentimen}
-"""
-            )
+""")
 
         else:
 
-            st.info(
-                f"""
+            st.info(f"""
 Frasa : {frasa}
-
 Aspek : {aspek}
-
 Sentimen : {sentimen}
-"""
-            )
+""")
 
     # ======================================
     # TOKEN LEVEL
@@ -113,7 +100,6 @@ Sentimen : {sentimen}
         st.markdown("### Token-Level Output")
 
         for token, label in zip(tokens, labels):
-
             st.text(f"{token:20} -> {label}")
 
 
@@ -123,13 +109,10 @@ Sentimen : {sentimen}
 if st.button("Analisis"):
 
     if not text.strip():
-
         st.warning("Masukkan teks terlebih dahulu.")
 
     else:
-
         with st.spinner("Memproses ulasan..."):
-
             show_result(text)
 
         st.divider()

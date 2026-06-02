@@ -1,5 +1,5 @@
 import streamlit as st
-from inference import predict  # ✅ FIX: hanya ini yang benar
+from inference import predict 
 
 # ==========================================
 # PAGE CONFIG

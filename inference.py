@@ -101,11 +101,28 @@ print("✓ BiLSTM-CRF loaded successfully")
 # ==========================================
 # PREPROCESS
 # ==========================================
+def clean_token(token_text):
+    text = str(token_text).strip()
+    if not text:
+        return None
+
+    text = re.sub(r"([.,!?;:])", r" \1 ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+    
 def preprocess_text(text):
     text = text.strip()
     if not text:
         return []
-    return text.split()
+
+    tokens = []
+    for t in text.split():
+        cleaned = clean_token(t)
+        if cleaned:
+            tokens.extend(cleaned.split())
+
+    return tokens
 
 # ==========================================
 # PREDICT LABELS

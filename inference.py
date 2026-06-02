@@ -6,39 +6,38 @@ import torch.nn as nn
 from torchcrf import CRF
 
 # ==========================================
-# CONFIG (FIXED FOR STREAMLIT DEPLOYMENT)
+# CONFIG (STREAMLIT SAFE)
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = BASE_DIR
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ==========================================
-# LOAD VOCAB & LABELS
+# LOAD FILES
 # ==========================================
-with open(os.path.join(MODEL_DIR, "vocab.pkl"), "rb") as f:
-    vocab = pickle.load(f)
+with open(os.path.join(BASE_DIR, "vocab.pkl"), "rb") as f:
+    vocab_w2i = pickle.load(f)
 
-with open(os.path.join(MODEL_DIR, "tag2idx.pkl"), "rb") as f:
+with open(os.path.join(BASE_DIR, "tag2idx.pkl"), "rb") as f:
     tag2idx = pickle.load(f)
 
-with open(os.path.join(MODEL_DIR, "idx2tag.pkl"), "rb") as f:
+with open(os.path.join(BASE_DIR, "idx2tag.pkl"), "rb") as f:
     idx2tag = pickle.load(f)
 
-with open(os.path.join(MODEL_DIR, "metadata.json"), "r", encoding="utf-8") as f:
+with open(os.path.join(BASE_DIR, "metadata.json"), "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
 best_params = metadata["best_params"]
 
 # ==========================================
-# LOAD EMBEDDING MATRIX
+# LOAD EMBEDDINGS
 # ==========================================
 pretrained_embeddings = torch.load(
-    os.path.join(MODEL_DIR, "embedding_matrix.pt"),
+    os.path.join(BASE_DIR, "embedding_matrix.pt"),
     map_location=DEVICE
 )
 
 # ==========================================
-# MODEL CLASS
+# MODEL
 # ==========================================
 class BiLSTM_CRF_Model(nn.Module):
 
@@ -67,9 +66,10 @@ class BiLSTM_CRF_Model(nn.Module):
         self.crf = CRF(num_tags, batch_first=True)
 
     def forward(self, x, mask):
-        embeds = self.dropout(self.embedding(x))
-        lstm_out, _ = self.bilstm(embeds)
-        emissions = self.fc(lstm_out)
+        x = self.embedding(x)
+        x = self.dropout(x)
+        x, _ = self.bilstm(x)
+        emissions = self.fc(x)
         return emissions
 
     def decode(self, x, mask):
@@ -77,10 +77,10 @@ class BiLSTM_CRF_Model(nn.Module):
         return self.crf.decode(emissions, mask=mask)
 
 # ==========================================
-# LOAD MODEL
+# LOAD MODEL WEIGHTS
 # ==========================================
 model = BiLSTM_CRF_Model(
-    vocab_size=len(vocab.w2i),
+    vocab_size=len(vocab_w2i),   # ✅ FIX HERE
     hidden_dim=best_params["hidden_dim"],
     num_tags=len(tag2idx),
     pretrained_embeddings=pretrained_embeddings
@@ -88,7 +88,7 @@ model = BiLSTM_CRF_Model(
 
 model.load_state_dict(
     torch.load(
-        os.path.join(MODEL_DIR, "bilstm_crf.pt"),
+        os.path.join(BASE_DIR, "bilstm_crf.pt"),
         map_location=DEVICE
     )
 )
@@ -96,7 +96,7 @@ model.load_state_dict(
 model.to(DEVICE)
 model.eval()
 
-print("✓ BiLSTM-CRF loaded")
+print("✓ BiLSTM-CRF loaded successfully")
 
 # ==========================================
 # PREPROCESS
@@ -118,12 +118,11 @@ def predict_labels(text):
         return [], []
 
     encoded = [
-        vocab.w2i.get(token.lower(), vocab.w2i["[UNK]"])
+        vocab_w2i.get(token.lower(), vocab_w2i.get("[UNK]", 0))  # ✅ FIX HERE
         for token in tokens
     ]
 
     x = torch.tensor([encoded], dtype=torch.long).to(DEVICE)
-
     mask = (x != 0)
 
     with torch.no_grad():
@@ -166,7 +165,6 @@ def extract_joint_absa(tokens, labels):
                     "aspek": aspek,
                     "sentimen": sentimen
                 })
-
                 current_tokens = []
                 current_entity = None
             continue
@@ -176,7 +174,6 @@ def extract_joint_absa(tokens, labels):
 
         prefix, entity = label.split("-", 1)
 
-        # U
         if prefix == "U":
             aspek, sentimen = split_label(entity)
             results.append({
@@ -185,7 +182,6 @@ def extract_joint_absa(tokens, labels):
                 "sentimen": sentimen
             })
 
-        # B
         elif prefix == "B":
 
             if current_tokens:
@@ -199,7 +195,6 @@ def extract_joint_absa(tokens, labels):
             current_tokens = [token]
             current_entity = entity
 
-        # I / L
         elif prefix in ["I", "L"]:
             current_tokens.append(token)
 
@@ -214,7 +209,7 @@ def extract_joint_absa(tokens, labels):
                 current_tokens = []
                 current_entity = None
 
-    # handle sisa entity
+    # leftover entity
     if current_tokens:
         aspek, sentimen = split_label(current_entity)
         results.append({
@@ -249,12 +244,8 @@ if __name__ == "__main__":
 
     result = predict(sample)
 
-    print("\nTOKENS")
-    print(result["tokens"])
-
-    print("\nLABELS")
-    print(result["labels"])
-
-    print("\nABSA")
+    print("\nTOKENS:", result["tokens"])
+    print("\nLABELS:", result["labels"])
+    print("\nABSA:")
     for item in result["extracted"]:
         print(item)

@@ -2,3 +2,4 @@ streamlit
 torch
 torchcrf
 numpy
+pytorch-crf

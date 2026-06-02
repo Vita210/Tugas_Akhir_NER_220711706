@@ -1,20 +1,17 @@
 import streamlit as st
-import pandas as pd
-from inference import predict
 
 st.set_page_config(page_title="ABSA System", layout="wide")
 
 st.title("Aspect-Based Sentiment Analysis (ABSA)")
 
-# =========================
-# SIDEBAR MENU (NO DROPDOWN)
-# =========================
-menu = st.sidebar.radio(
-    "Navigation",
-    ["Home", "Dataset Explorer", "Prediction"]
-)
+st.sidebar.title("Menu")
 
-st.sidebar.info("Model: BiLSTM-CRF (Best Model)")
+if st.sidebar.button("Home"):
+    st.session_state.page = "home"
+if st.sidebar.button("Dataset Explorer"):
+    st.session_state.page = "dataset"
+if st.sidebar.button("Prediction"):
+    st.session_state.page = "prediction"
 
 # =========================
 # HOME
@@ -25,23 +22,32 @@ if menu == "Home":
     st.write("""
     Sistem ini digunakan untuk melakukan **Aspect-Based Sentiment Analysis (ABSA)** pada ulasan e-commerce Bahasa Indonesia.
 
-    Model:
+    Model yang digunakan:
     - CRF
     - BiGRU-CRF
     - BiLSTM-CRF (Best Model)
 
-    Output:
-    - Ekstraksi aspek
-    - Sentimen tiap aspek
+    Output sistem:
+    - Ekstraksi aspek (contoh: pengiriman, kualitas)
+    - Sentimen tiap aspek (positive / negative / neutral)
     """)
 
+    st.info("Gunakan menu di sidebar untuk eksplor dataset atau melakukan prediksi.")
+
 # =========================
-# DATASET
+# DATASET EXPLORER
 # =========================
 elif menu == "Dataset Explorer":
 
+    import pandas as pd
+
     st.subheader("📊 Dataset Explorer")
 
+    st.write("""
+    Dataset berisi ulasan e-commerce yang sudah dianotasi menggunakan skema BILOU.
+    """)
+
+    # contoh dummy kalau dataset belum di-load
     try:
         df = st.session_state.df
     except:
@@ -51,7 +57,7 @@ elif menu == "Dataset Explorer":
         })
 
     st.write("### Sample Data")
-    st.dataframe(df)
+    st.dataframe(df.head())
 
     st.write("### Statistik")
     st.write(f"Jumlah data: {len(df)}")
@@ -60,6 +66,8 @@ elif menu == "Dataset Explorer":
 # PREDICTION
 # =========================
 elif menu == "Prediction":
+
+    from inference import predict
 
     st.subheader("🔮 Prediction")
 

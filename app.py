@@ -14,13 +14,13 @@ st.sidebar.title("Menu")
 if "menu" not in st.session_state:
     st.session_state.menu = "Home"
 
-if st.sidebar.button("🏠 Home"):
+if st.sidebar.button("Home"):
     st.session_state.menu = "Home"
 
-if st.sidebar.button("📊 Dataset Explorer"):
+if st.sidebar.button("Dataset Explorer"):
     st.session_state.menu = "Dataset Explorer"
 
-if st.sidebar.button("🔮 Prediction"):
+if st.sidebar.button("Prediction"):
     st.session_state.menu = "Prediction"
 
 menu = st.session_state.menu

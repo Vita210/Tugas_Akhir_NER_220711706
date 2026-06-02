@@ -45,18 +45,17 @@ def main():
     st.title("Aspect-Based Sentiment Analysis (ABSA)")
     st.markdown("Model: **BiLSTM-CRF** untuk ekstraksi aspek dan sentimen.")
 
-    # Sidebar
-    st.sidebar.header("Pengaturan")
-    show_detail = st.sidebar.checkbox("Tampilkan token-level output", value=False)
+    st.sidebar.header("Informasi")
+    st.sidebar.info("Aplikasi ini menggunakan model BiLSTM-CRF untuk mendeteksi aspek dan sentimen dalam ulasan produk elektronik e-commerce dari Tokopedia dan Shopee.")
 
-    # Input
     text = st.text_area(
         "Masukkan ulasan:",
         height=150,
         placeholder="Contoh: packing aman tapi pengiriman lambat"
     )
 
-    # Process
+    show_detail = st.checkbox("Tampilkan token-level output", value=False)
+
     if st.button("Analisis"):
         if not text.strip():
             st.warning("Masukkan teks terlebih dahulu.")
@@ -65,10 +64,8 @@ def main():
         with st.spinner("Memproses ulasan..."):
             result = predict(text)
             
-            # Tampilkan Hasil Utama
             display_results(result["extracted"])
 
-            # Tampilkan Detail jika dicentang
             if show_detail:
                 show_token_details(result["tokens"], result["labels"])
 

@@ -4,14 +4,10 @@ st.set_page_config(page_title="ABSA System", layout="wide")
 
 st.title("Aspect-Based Sentiment Analysis (ABSA)")
 
-st.sidebar.title("Menu")
-
-if st.sidebar.button("Home"):
-    st.session_state.page = "home"
-if st.sidebar.button("Dataset Explorer"):
-    st.session_state.page = "dataset"
-if st.sidebar.button("Prediction"):
-    st.session_state.page = "prediction"
+menu = st.sidebar.selectbox(
+    "Menu",
+    ["Home", "Dataset Explorer", "Prediction"]
+)
 
 # =========================
 # HOME

@@ -4,7 +4,10 @@ from inference import predict
 st.set_page_config(page_title="Prediction", layout="wide")
 
 st.title("Prediction - ABSA Model")
-st.markdown("Masukkan ulasan produk untuk melihat aspek dan sentimen yang terdeteksi oleh model BiLSTM-CRF.")
+
+st.markdown("""
+Masukkan ulasan produk untuk melihat aspek dan sentimen yang terdeteksi oleh model BiLSTM-CRF.
+""")
 
 text = st.text_area(
     "Input Review:",
@@ -17,8 +20,9 @@ def display_results(extracted_data):
         return
 
     st.subheader("Hasil Prediksi")
+
     cols = st.columns(3)
-    
+
     for i, item in enumerate(extracted_data):
         with cols[i % 3].container(border=True):
             st.write(f"**Frasa:** {item['frasa']}")
@@ -26,14 +30,14 @@ def display_results(extracted_data):
             st.write(f"**Sentimen:** {item['sentimen']}")
 
 if st.button("Analisis"):
-    if not text.strip():
+    if text.strip() == "":
         st.warning("Masukkan teks dulu.")
     else:
         with st.spinner("Memproses..."):
             result = predict(text)
-        
+
         display_results(result["extracted"])
-        
+
         st.divider()
         st.subheader("Token Level")
         st.table([

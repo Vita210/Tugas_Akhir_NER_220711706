@@ -1,4 +1,5 @@
 import streamlit as st
+from inference import load_prepare_split
 
 st.set_page_config(page_title="ABSA System", layout="wide")
 

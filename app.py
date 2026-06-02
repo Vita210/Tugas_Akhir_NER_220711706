@@ -1,22 +1,31 @@
 import streamlit as st
-from inference import load_prepare_split  # kalau mau
 
 st.set_page_config(page_title="ABSA System", layout="wide")
 
-st.title("Aspect-Based Sentiment Analysis (ABSA)")
-st.markdown("""
-## Selamat datang 👋
+st.title("ABSA System")
 
-Aplikasi ini digunakan untuk:
-- Ekstraksi aspek dari ulasan e-commerce
-- Analisis sentimen berbasis aspek
-- Model: BiLSTM-CRF
+menu = st.sidebar.radio(
+    "Navigation",
+    ["Home", "Dataset Explorer", "Prediction"]
+)
 
-### Menu:
-- Dataset Explorer → eksplorasi dataset
-- Prediction → uji model dengan input teks
-""")
+if menu == "Home":
+    st.subheader("Deskripsi Sistem")
+    st.write("""
+    Sistem ABSA untuk analisis aspek dan sentimen ulasan e-commerce Indonesia.
 
-st.divider()
+    Model:
+    - CRF
+    - BiGRU-CRF
+    - BiLSTM-CRF (Best)
 
-st.info("Gunakan sidebar untuk navigasi ke halaman lain.")
+    Output:
+    - aspek
+    - sentimen
+    """)
+
+elif menu == "Dataset Explorer":
+    import dataset_explorer
+
+elif menu == "Prediction":
+    import prediction

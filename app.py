@@ -4,121 +4,76 @@ from inference import predict
 # ==========================================
 # PAGE CONFIG
 # ==========================================
-st.set_page_config(
-    page_title="ABSA E-Commerce",
-    layout="wide"
-)
+st.set_page_config(page_title="ABSA E-Commerce", layout="wide")
 
 # ==========================================
-# TITLE
+# UI HELPER FUNCTIONS
 # ==========================================
-st.title("Aspect-Based Sentiment Analysis (ABSA)")
-
-st.markdown("""
-Model yang digunakan:
-
-- BiLSTM-CRF
-
-Model akan mengekstraksi aspek dan sentimen
-dari ulasan produk e-commerce.
-""")
-
-# ==========================================
-# SIDEBAR
-# ==========================================
-st.sidebar.header("Pengaturan")
-
-show_detail = st.sidebar.checkbox(
-    "Tampilkan token-level output",
-    value=False
-)
-
-# ==========================================
-# INPUT
-# ==========================================
-text = st.text_area(
-    "Masukkan ulasan:",
-    height=150,
-    placeholder="contoh: packing aman tapi pengiriman lambat"
-)
-
-# ==========================================
-# SHOW RESULT
-# ==========================================
-def show_result(text):
-
-    result = predict(text)
-
-    tokens = result["tokens"]
-    labels = result["labels"]
-    extracted = result["extracted"]
-
-    if not extracted:
-        st.warning("Tidak ada aspek terdeteksi.")
+def display_results(extracted_data: list):
+    """Menampilkan hasil ekstraksi dalam format grid (columns)."""
+    if not extracted_data:
+        st.warning("Tidak ada aspek yang terdeteksi.")
         return
 
     st.subheader("Hasil Analisis")
-
-    # ==============================
-    # RESULT CARD UI (FIXED LAYOUT)
-    # ==============================
-    for item in extracted:
-
+    
+    cols = st.columns(3)
+    
+    for i, item in enumerate(extracted_data):
         frasa = item["frasa"]
         aspek = item["aspek"]
-        sentimen = item["sentimen"]
+        sentimen = item["sentimen"].lower()
 
-        # tentukan style
-        if sentimen.lower() == "positive":
-            box = st.success
-        elif sentimen.lower() == "negative":
-            box = st.error
-        else:
-            box = st.info
+        color_map = {"positive": "green", "negative": "red", "neutral": "blue"}
+        status_color = color_map.get(sentimen, "gray")
+        
+        with cols[i % 3].container(border=True):
+            st.markdown(f"**Frasa:** `{frasa}`")
+            st.markdown(f"**Aspek:** {aspek}")
+            st.markdown(f"**Sentimen:** :{status_color}[{sentimen.upper()}]")
 
-        # card container
-        with st.container(border=True):
-            col1, col2, col3 = st.columns([2, 2, 1])
-
-            with col1:
-                st.markdown("**Frasa**")
-                st.write(frasa)
-
-            with col2:
-                st.markdown("**Aspek**")
-                st.write(aspek)
-
-            with col3:
-                st.markdown("**Sentimen**")
-                box(sentimen)
-
-    # ======================================
-    # TOKEN LEVEL OUTPUT
-    # ======================================
-    if show_detail:
-
-        st.markdown("### Token-Level Output")
-
-        with st.container(border=True):
-            for token, label in zip(tokens, labels):
-                st.text(f"{token:20} -> {label}")
-
+def show_token_details(tokens: list, labels: list):
+    """Menampilkan detail token level dalam bentuk tabel."""
+    st.markdown("### Token-Level Output")
+    data = [{"Token": t, "Label": l} for t, l in zip(tokens, labels)]
+    st.table(data)
 
 # ==========================================
-# PROCESS
+# MAIN APP
 # ==========================================
-if st.button("Analisis"):
+def main():
+    st.title("Aspect-Based Sentiment Analysis (ABSA)")
+    st.markdown("Model: **BiLSTM-CRF** untuk ekstraksi aspek dan sentimen.")
 
-    if not text.strip():
-        st.warning("Masukkan teks terlebih dahulu.")
+    # Sidebar
+    st.sidebar.header("Pengaturan")
+    show_detail = st.sidebar.checkbox("Tampilkan token-level output", value=False)
 
-    else:
+    # Input
+    text = st.text_area(
+        "Masukkan ulasan:",
+        height=150,
+        placeholder="Contoh: packing aman tapi pengiriman lambat"
+    )
+
+    # Process
+    if st.button("Analisis"):
+        if not text.strip():
+            st.warning("Masukkan teks terlebih dahulu.")
+            return
+
         with st.spinner("Memproses ulasan..."):
-            show_result(text)
+            result = predict(text)
+            
+            # Tampilkan Hasil Utama
+            display_results(result["extracted"])
+
+            # Tampilkan Detail jika dicentang
+            if show_detail:
+                show_token_details(result["tokens"], result["labels"])
 
         st.divider()
+        st.caption("Skema label menggunakan BILOU (Begin, Inside, Last, Unit, Outside)")
 
-        st.caption(
-            "Skema label menggunakan BILOU "
-            "(Begin, Inside, Last, Unit, Outside)"
-        )
+if __name__ == "__main__":
+    main()

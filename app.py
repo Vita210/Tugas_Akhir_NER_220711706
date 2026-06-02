@@ -47,7 +47,6 @@ text = st.text_area(
 # ==========================================
 def show_result(text):
 
-    # ✅ FIX: pakai predict() bukan 2 fungsi terpisah
     result = predict(text)
 
     tokens = result["tokens"]
@@ -60,45 +59,49 @@ def show_result(text):
 
     st.subheader("Hasil Analisis")
 
+    # ==============================
+    # RESULT CARD UI (FIXED LAYOUT)
+    # ==============================
     for item in extracted:
 
         frasa = item["frasa"]
         aspek = item["aspek"]
         sentimen = item["sentimen"]
 
+        # tentukan style
         if sentimen.lower() == "positive":
-
-            st.success(f"""
-Frasa : {frasa}
-Aspek : {aspek}
-Sentimen : {sentimen}
-""")
-
+            box = st.success
         elif sentimen.lower() == "negative":
-
-            st.error(f"""
-Frasa : {frasa}
-Aspek : {aspek}
-Sentimen : {sentimen}
-""")
-
+            box = st.error
         else:
+            box = st.info
 
-            st.info(f"""
-Frasa : {frasa}
-Aspek : {aspek}
-Sentimen : {sentimen}
-""")
+        # card container
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([2, 2, 1])
+
+            with col1:
+                st.markdown("**Frasa**")
+                st.write(frasa)
+
+            with col2:
+                st.markdown("**Aspek**")
+                st.write(aspek)
+
+            with col3:
+                st.markdown("**Sentimen**")
+                box(sentimen)
 
     # ======================================
-    # TOKEN LEVEL
+    # TOKEN LEVEL OUTPUT
     # ======================================
     if show_detail:
 
         st.markdown("### Token-Level Output")
 
-        for token, label in zip(tokens, labels):
-            st.text(f"{token:20} -> {label}")
+        with st.container(border=True):
+            for token, label in zip(tokens, labels):
+                st.text(f"{token:20} -> {label}")
 
 
 # ==========================================

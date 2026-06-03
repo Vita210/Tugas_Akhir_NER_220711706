@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 st.title("📊 Dataset Explorer")
 
@@ -9,37 +10,54 @@ yang telah dianotasi menggunakan skema **BILOU**
 (Begin, Inside, Last, Unit, Outside).
 """)
 
-# jika nanti punya dataset asli
-if "df" in st.session_state:
-    df = st.session_state.df
-else:
-    df = pd.DataFrame({
-        "text": [
-            "produk bagus",
-            "pengiriman lambat",
-            "packing aman",
-            "barang sesuai deskripsi",
-            "harga terlalu mahal"
-        ],
-        "label": [
-            "positive",
-            "negative",
-            "neutral",
-            "positive",
-            "negative"
-        ]
-    })
+# ==========================================
+# LOAD DATASET
+# ==========================================
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-col1, col2 = st.columns(2)
+train_path = os.path.join(ROOT_DIR, "data", "data_train_bilou.jsonl")
+val_path = os.path.join(ROOT_DIR, "data", "data_val_bilou.jsonl")
+test_path = os.path.join(ROOT_DIR, "data", "data_test_bilou.jsonl")
+
+@st.cache_data
+def load_dataset():
+    train_df = pd.read_json(train_path, lines=True)
+    val_df = pd.read_json(val_path, lines=True)
+    test_df = pd.read_json(test_path, lines=True)
+
+    train_df["split"] = "train"
+    val_df["split"] = "validation"
+    test_df["split"] = "test"
+
+    return pd.concat(
+        [train_df, val_df, test_df],
+        ignore_index=True
+    )
+
+df = load_dataset()
+
+# ==========================================
+# OVERVIEW
+# ==========================================
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("Jumlah Data", len(df))
+    st.metric("Total Data", len(df))
 
 with col2:
     st.metric("Jumlah Kolom", len(df.columns))
 
+with col3:
+    st.metric(
+        "Jumlah Split",
+        df["split"].nunique()
+    )
+
 st.divider()
 
+# ==========================================
+# SAMPLE DATA
+# ==========================================
 st.subheader("Sample Data")
 
 st.dataframe(
@@ -49,10 +67,13 @@ st.dataframe(
 
 st.divider()
 
-if "label" in df.columns:
+# ==========================================
+# DISTRIBUSI SPLIT
+# ==========================================
+st.subheader("Distribusi Dataset")
 
-    st.subheader("Distribusi Label")
+split_count = df["split"].value_counts()
 
-    label_count = df["label"].value_counts()
+st.bar_chart(split_count)
 
-    st.bar_chart(label_count)
+st.write(split_count)

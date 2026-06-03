@@ -41,8 +41,9 @@ for i, row in filtered_df.head(n_rows).iterrows():
     with st.expander(f"Ulasan #{i+1}: {' '.join(row[TOKEN_COL][:10])}..."):
         st.write("**Anotasi BILOU:**")
         
-        # Menggunakan grid per baris agar tidak menyamping terus
-        cols_per_row = 6 
+        # Mengubah cols_per_row menjadi 1 agar selalu menyusun ke bawah
+        # Jika ingin 2 kolom, ganti angka ini menjadi 2
+        cols_per_row = 1 
         tokens = row[TOKEN_COL]
         labels = row[LABEL_COL]
         
@@ -51,8 +52,14 @@ for i, row in filtered_df.head(n_rows).iterrows():
             for k in range(cols_per_row):
                 if j + k < len(tokens):
                     with cols[k]:
-                        st.caption(f"**{tokens[j+k]}**")
-                        st.code(labels[j+k])
+                        # Menggunakan layout horizontal dalam satu kolom
+                        # Agar token dan label tidak makan tempat vertikal terlalu banyak
+                        c1, c2 = st.columns([1, 3])
+                        with c1:
+                            st.caption(f"**{tokens[j+k]}**")
+                        with c2:
+                            # Menggunakan markdown biasa daripada st.code
+                            st.text(labels[j+k])
 
 st.divider()
 st.subheader("🏷️ Distribusi Label (Tanpa 'O')")

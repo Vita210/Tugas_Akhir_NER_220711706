@@ -1,94 +1,59 @@
 import streamlit as st
-import pandas as pd
-import os
+import matplotlib.pyplot as plt
+from utils.visualization import plot_label_distribution
+from utils.data_loader import load_data
 
-st.title("📊 Dataset Explorer")
+st.set_page_config(page_title="Dataset Explorer", layout="wide")
+st.title("Dataset Explorer")
 
-st.markdown("""
-Halaman ini digunakan untuk mengeksplorasi dataset ulasan e-commerce
-yang telah dianotasi menggunakan skema **BILOU**
-(Begin, Inside, Last, Unit, Outside).
-""")
+if 'df' not in st.session_state:
+    st.session_state.df = load_data()
 
-# ==========================================
-# LOAD DATASET
-# ==========================================
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Access data from session state
+df = st.session_state.df
 
-train_path = os.path.join(ROOT_DIR, "data", "data_train_bilou.jsonl")
-val_path = os.path.join(ROOT_DIR, "data", "data_val_bilou.jsonl")
-test_path = os.path.join(ROOT_DIR, "data", "data_test_bilou.jsonl")
+# Show basic dataset info
+st.subheader("Dataset Overview")
+st.write(f"Number of samples: {df.shape[0]}")
+st.write(f"Number of features: {df.shape[1]}")
 
-@st.cache_data
-def load_dataset():
-    train_df = pd.read_json(train_path, lines=True)
-    val_df = pd.read_json(val_path, lines=True)
-    test_df = pd.read_json(test_path, lines=True)
+# Display sample data
+st.subheader("Sample Data")
+st.dataframe(df.head())
 
-    train_df["split"] = "train"
-    val_df["split"] = "validation"
-    test_df["split"] = "test"
+# Show label distribution
+st.subheader("Label Distribution")
+cols = st.columns(3)
 
-    return pd.concat(
-        [train_df, val_df, test_df],
-        ignore_index=True
-    )
+for i, column in enumerate(['fuel', 'machine', 'part']):
+    with cols[i % 3]:
+        fig = plot_label_distribution(df, column)
+        st.pyplot(fig)
 
-df = load_dataset()
+# Sample sentences per sentiment
+st.subheader("Sample Sentences by Sentiment")
 
-# ==========================================
-# OVERVIEW
-# ==========================================
+# Select sentiment to explore
+sentiment_to_explore = st.selectbox(
+    "Choose sentiment to explore:",
+    ["fuel", "machine", "part"]
+)
+
+# Display examples for each sentiment value
+st.write(f"### {sentiment_to_explore.capitalize()} Sentiment Examples")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("Total Data", len(df))
+    st.write("#### Negative")
+    for _, row in df[df[sentiment_to_explore] == 'negative'].head(3).iterrows():
+        st.write(f"- {row['Sentence']}")
 
 with col2:
-    st.metric("Jumlah Kolom", len(df.columns))
+    st.write("#### Neutral")
+    for _, row in df[df[sentiment_to_explore] == 'neutral'].head(3).iterrows():
+        st.write(f"- {row['Sentence']}")
 
 with col3:
-    st.metric(
-        "Jumlah Split",
-        df["split"].nunique()
-    )
-
-st.divider()
-
-# ==========================================
-# SAMPLE DATA
-# ==========================================
-st.subheader("Sample Data")
-
-sample_df = df.head(10).copy()
-
-if "tokens" in sample_df.columns:
-    sample_df["tokens"] = sample_df["tokens"].apply(
-        lambda x: " ".join(x[:15]) + " ..."
-        if isinstance(x, list) and len(x) > 15
-        else " ".join(x) if isinstance(x, list) else x
-    )
-
-if "labels" in sample_df.columns:
-    sample_df["labels"] = sample_df["labels"].apply(
-        lambda x: ", ".join(x[:10]) + " ..."
-        if isinstance(x, list) and len(x) > 10
-        else ", ".join(x) if isinstance(x, list) else x
-    )
-
-st.dataframe(
-    sample_df,
-    use_container_width=True,
-    hide_index=True
-)
-
-# ==========================================
-# DISTRIBUSI SPLIT
-# ==========================================
-st.subheader("Distribusi Dataset")
-
-split_count = df["split"].value_counts()
-
-st.bar_chart(split_count)
-
-st.write(split_count)
+    st.write("#### Positive")
+    for _, row in df[df[sentiment_to_explore] == 'positive'].head(3).iterrows():
+        st.write(f"- {row['Sentence']}")

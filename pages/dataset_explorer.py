@@ -5,13 +5,19 @@ import os
 
 st.set_page_config(page_title="Dataset Explorer", layout="wide")
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(ROOT_DIR, "data", "data_all.jsonl")
-LABEL_PATH = os.path.join(ROOT_DIR, "data", "label_list.json")
+BASE_DIR = os.getcwd()
+DATA_FILES = ["data_train_bilou.jsonl", "data_val_bilou.jsonl", "data_test_bilou.jsonl"]
+LABEL_PATH = os.path.join(BASE_DIR, "data", "label_list.json")
 
 @st.cache_data
 def load_data():
-    df = pd.read_json(DATA_PATH, lines=True)
+    df_list = []
+    for file in DATA_FILES:
+        path = os.path.join(BASE_DIR, "data", file)
+        df_list.append(pd.read_json(path, lines=True))
+    
+    df = pd.concat(df_list, ignore_index=True)
+    
     with open(LABEL_PATH, "r", encoding="utf-8") as f:
         labels = json.load(f)
     return df, labels

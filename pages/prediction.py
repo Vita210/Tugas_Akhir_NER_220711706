@@ -12,28 +12,28 @@ st.set_page_config(page_title="Prediction", layout="wide")
 # =========================
 # CONFIG
 # =========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # =========================
 # LOAD ARTIFACT
 # =========================
-with open(os.path.join(BASE_DIR, "vocab.pkl"), "rb") as f:
+with open(os.path.join(ROOT_DIR, "vocab.pkl"), "rb") as f:
     vocab_w2i = pickle.load(f)
 
-with open(os.path.join(BASE_DIR, "tag2idx.pkl"), "rb") as f:
+with open(os.path.join(ROOT_DIR, "tag2idx.pkl"), "rb") as f:
     tag2idx = pickle.load(f)
 
-with open(os.path.join(BASE_DIR, "idx2tag.pkl"), "rb") as f:
+with open(os.path.join(ROOT_DIR, "idx2tag.pkl"), "rb") as f:
     idx2tag = pickle.load(f)
 
-with open(os.path.join(BASE_DIR, "metadata.json"), "r", encoding="utf-8") as f:
+with open(os.path.join(ROOT_DIR, "metadata.json"), "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
 best_params = metadata["best_params"]
 
 pretrained_embeddings = torch.load(
-    os.path.join(BASE_DIR, "embedding_matrix.pt"),
+    os.path.join(ROOT_DIR, "embedding_matrix.pt"),
     map_location=DEVICE
 )
 
@@ -89,7 +89,7 @@ def load_model():
 
     model.load_state_dict(
         torch.load(
-            os.path.join(BASE_DIR, "bilstm_crf.pt"),
+            os.path.join(ROOT_DIR, "bilstm_crf.pt"),
             map_location=DEVICE
         )
     )

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Dataset Explorer", layout="wide")
 
@@ -53,23 +54,23 @@ for i, row in filtered_df.head(n_rows).iterrows():
         tokens = row[TOKEN_COL]
         labels = row[LABEL_COL]
         
-        html_content = ""
+        html_string = '<div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: sans-serif;">'
         for token, label in zip(tokens, labels):
-            # Warna untuk 'O' (abu-abu) dan Entitas (hijau muda)
             bg_color = "#f0f2f6" if label == "O" else "#d1e7dd"
             text_color = "#333" if label == "O" else "#0f5132"
             border_color = "#ccc" if label == "O" else "#badbcc"
             
-            html_content += f"""
-            <div style="display: inline-block; margin: 4px; padding: 4px 8px; 
-                        background-color: {bg_color}; border-radius: 6px; 
-                        border: 1px solid {border_color}; text-align: center;">
-                <div style="font-weight: bold; font-size: 14px; color: #000;">{token}</div>
-                <div style="font-size: 10px; color: {text_color}; font-family: monospace; font-weight: bold;">{label}</div>
+            html_string += f"""
+            <div style="display: inline-block; padding: 5px 10px; background-color: {bg_color}; 
+                        border-radius: 6px; border: 1px solid {border_color}; text-align: center;">
+                <div style="font-weight: bold; font-size: 14px; color: #000; line-height: 1;">{token}</div>
+                <div style="font-size: 10px; color: {text_color}; font-weight: bold; margin-top: 4px;">{label}</div>
             </div>
             """
+        html_string += '</div>'
         
-        st.markdown(f'<div style="line-height: 2.8;">{html_content}</div>', unsafe_allow_html=True)
+        # Menggunakan components.html agar dirender sebagai elemen visual
+        components.html(html_string, height=150, scrolling=True)
 
 st.divider()
 

@@ -1,19 +1,14 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 import json
 import os
 from collections import Counter
 
 st.title("📊 Dataset Explorer")
 
-st.markdown("""
-Halaman ini digunakan untuk mengeksplorasi dataset ulasan e-commerce
-yang telah dianotasi menggunakan skema **BILOU**
-(Begin, Inside, Last, Unit, Outside).
-""")
-
 # ==========================================
-# PATH
+# LOAD DATASET
 # ==========================================
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -21,12 +16,7 @@ train_path = os.path.join(ROOT_DIR, "data", "data_train_bilou.jsonl")
 val_path = os.path.join(ROOT_DIR, "data", "data_val_bilou.jsonl")
 test_path = os.path.join(ROOT_DIR, "data", "data_test_bilou.jsonl")
 
-label_path = os.path.join(ROOT_DIR, "data", "label_list.json")
 
-
-# ==========================================
-# LOAD DATASET
-# ==========================================
 @st.cache_data
 def load_dataset():
 
@@ -44,184 +34,201 @@ def load_dataset():
     )
 
 
-@st.cache_data
-def load_labels():
-    with open(label_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
 df = load_dataset()
-label_list = load_labels()
 
 # ==========================================
 # DATASET OVERVIEW
 # ==========================================
-st.subheader("📈 Dataset Overview")
+st.subheader("Dataset Overview")
 
-col1, col2, col3, col4 = st.columns(4)
+st.write(f"Number of samples : {df.shape[0]}")
+st.write(f"Number of features : {df.shape[1]}")
+
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("Total Data", len(df))
+    st.metric("Train", (df["split"] == "Train").sum())
 
 with col2:
-    st.metric("Jumlah Kolom", len(df.columns))
+    st.metric("Validation", (df["split"] == "Validation").sum())
 
 with col3:
-    st.metric("Jumlah Split", df["split"].nunique())
-
-with col4:
-    st.metric("Jumlah Label", len(label_list))
-
-st.divider()
-
-# ==========================================
-# DISTRIBUSI DATASET
-# ==========================================
-st.subheader("📊 Distribusi Dataset")
-
-split_count = df["split"].value_counts()
-
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.bar_chart(split_count)
-
-with col2:
-    st.dataframe(
-        split_count.reset_index().rename(
-            columns={
-                "index": "Split",
-                "count": "Jumlah"
-            }
-        ),
-        hide_index=True,
-        use_container_width=True
-    )
-
-st.divider()
+    st.metric("Test", (df["split"] == "Test").sum())
 
 # ==========================================
 # SAMPLE DATA
 # ==========================================
-st.subheader("📝 Sample Data")
+st.subheader("Sample Data")
 
 preview_df = df.copy()
 
 if "tokens" in preview_df.columns:
 
-    preview_df["Teks"] = preview_df["tokens"].apply(
-        lambda x: " ".join(x[:25])
+    preview_df["Review"] = preview_df["tokens"].apply(
+        lambda x: " ".join(x)
         if isinstance(x, list)
         else str(x)
     )
 
-    display_cols = ["Teks", "split"]
+    st.dataframe(
+        preview_df[["Review", "split"]].head(10),
+        use_container_width=True,
+        hide_index=True
+    )
 
-elif "sentence" in preview_df.columns:
+# ==========================================
+# LABEL DISTRIBUTION
+# ==========================================
+st.subheader("Label Distribution")
 
-    display_cols = ["sentence", "split"]
+aspect_counter = Counter()
+sentiment_counter = Counter()
+prefix_counter = Counter()
 
-else:
+for labels in df["labels"]:
 
-    display_cols = preview_df.columns.tolist()
+    for label in labels:
 
-st.dataframe(
-    preview_df[display_cols].head(20),
-    hide_index=True,
-    use_container_width=True
+        if label == "O":
+            prefix_counter["O"] += 1
+            continue
+
+        prefix, entity = label.split("-", 1)
+
+        prefix_counter[prefix] += 1
+
+        if "_" in entity:
+
+            aspect = "_".join(entity.split("_")[:-1])
+            sentiment = entity.split("_")[-1]
+
+            aspect_counter[aspect] += 1
+            sentiment_counter[sentiment] += 1
+
+# ==========================================
+# 3 CHARTS
+# ==========================================
+cols = st.columns(3)
+
+with cols[0]:
+
+    st.markdown("#### Aspect Distribution")
+
+    fig, ax = plt.subplots()
+
+    ax.bar(
+        aspect_counter.keys(),
+        aspect_counter.values()
+    )
+
+    plt.xticks(rotation=45)
+
+    st.pyplot(fig)
+
+with cols[1]:
+
+    st.markdown("#### Sentiment Distribution")
+
+    fig, ax = plt.subplots()
+
+    ax.bar(
+        sentiment_counter.keys(),
+        sentiment_counter.values()
+    )
+
+    st.pyplot(fig)
+
+with cols[2]:
+
+    st.markdown("#### BILOU Distribution")
+
+    fig, ax = plt.subplots()
+
+    ax.bar(
+        prefix_counter.keys(),
+        prefix_counter.values()
+    )
+
+    st.pyplot(fig)
+
+# ==========================================
+# SAMPLE REVIEWS BY ASPECT
+# ==========================================
+st.subheader("Sample Reviews by Aspect")
+
+available_aspects = sorted(list(aspect_counter.keys()))
+
+selected_aspect = st.selectbox(
+    "Choose aspect:",
+    available_aspects
 )
 
-st.divider()
+examples = []
+
+for _, row in df.iterrows():
+
+    labels = row["labels"]
+
+    found = False
+
+    for lbl in labels:
+
+        if selected_aspect in lbl:
+            found = True
+            break
+
+    if found:
+
+        if "tokens" in row:
+            examples.append(
+                " ".join(row["tokens"])
+            )
+
+    if len(examples) >= 9:
+        break
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+
+    st.write("#### Example 1-3")
+
+    for text in examples[:3]:
+        st.write(f"- {text}")
+
+with col2:
+
+    st.write("#### Example 4-6")
+
+    for text in examples[3:6]:
+        st.write(f"- {text}")
+
+with col3:
+
+    st.write("#### Example 7-9")
+
+    for text in examples[6:9]:
+        st.write(f"- {text}")
 
 # ==========================================
-# CONTOH ANOTASI
+# ANNOTATION EXAMPLES
 # ==========================================
-st.subheader("🏷️ Contoh Anotasi BILOU")
+st.subheader("Annotation Examples")
 
-sample_size = min(5, len(df))
-
-for i in range(sample_size):
+for i in range(min(5, len(df))):
 
     row = df.iloc[i]
 
     with st.container(border=True):
 
-        st.markdown(f"**Data #{i+1}**")
+        st.write(f"### Data {i+1}")
 
-        if "tokens" in row:
-            st.write("**Teks:**")
-            st.write(" ".join(row["tokens"]))
+        st.write(
+            " ".join(row["tokens"])
+        )
 
-        if "labels" in row:
-            st.write("**Label BILOU:**")
-            st.code(" | ".join(row["labels"]))
+        st.code(
+            " | ".join(row["labels"])
+        )
 
-        st.caption(f"Split: {row['split']}")
-
-st.divider()
-
-# ==========================================
-# LABEL INFORMATION
-# ==========================================
-st.subheader("📑 Label BILOU")
-
-prefix_counter = Counter()
-
-for label in label_list:
-
-    if label == "O":
-        prefix_counter["O"] += 1
-    else:
-        prefix = label.split("-")[0]
-        prefix_counter[prefix] += 1
-
-col1, col2 = st.columns([1, 2])
-
-with col1:
-
-    st.write("### Ringkasan Prefix")
-
-    prefix_df = pd.DataFrame({
-        "Prefix": list(prefix_counter.keys()),
-        "Jumlah": list(prefix_counter.values())
-    })
-
-    st.dataframe(
-        prefix_df,
-        hide_index=True,
-        use_container_width=True
-    )
-
-with col2:
-
-    st.write("### Seluruh Label")
-
-    label_df = pd.DataFrame({
-        "Label": label_list
-    })
-
-    st.dataframe(
-        label_df,
-        height=400,
-        hide_index=True,
-        use_container_width=True
-    )
-
-st.divider()
-
-# ==========================================
-# INFORMASI DATASET
-# ==========================================
-st.subheader("ℹ️ Informasi Dataset")
-
-train_count = (df["split"] == "Train").sum()
-val_count = (df["split"] == "Validation").sum()
-test_count = (df["split"] == "Test").sum()
-
-st.markdown(f"""
-- **Data Train** : {train_count:,}
-- **Data Validation** : {val_count:,}
-- **Data Test** : {test_count:,}
-- **Total Data** : {len(df):,}
-- **Jumlah Label BILOU** : {len(label_list):,}
-""")
+        st.caption(row["split"])

@@ -38,11 +38,7 @@ def get_base_label(label):
     if label == 'O': return 'O'
     return label.split('-', 1)[1] if '-' in label else label
 
-# --- FITUR ANALISIS (Sekarang Atas-Bawah) ---
-st.subheader("📏 Distribusi Panjang Kalimat")
-df['seq_len'] = df[TOKEN_COL].apply(len)
-st.bar_chart(df['seq_len'].value_counts().sort_index())
-
+# --- FITUR ANALISIS ---
 st.subheader("🏷️ Filter Kategori Label")
 all_flat_labels = [get_base_label(l) for sublist in df[LABEL_COL] for l in sublist if l != 'O']
 unique_categories = sorted(list(set(all_flat_labels)))

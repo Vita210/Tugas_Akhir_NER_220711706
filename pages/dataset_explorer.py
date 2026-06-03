@@ -2,226 +2,64 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-from collections import Counter
+
+st.set_page_config(page_title="Dataset Explorer", layout="wide")
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(ROOT_DIR, "data", "data_all.jsonl")
+LABEL_PATH = os.path.join(ROOT_DIR, "data", "label_list.json")
+
+@st.cache_data
+def load_data():
+    df = pd.read_json(DATA_PATH, lines=True)
+    with open(LABEL_PATH, "r", encoding="utf-8") as f:
+        labels = json.load(f)
+    return df, labels
+
+if 'df' not in st.session_state or 'labels' not in st.session_state:
+    st.session_state.df, st.session_state.labels = load_data()
 
 st.title("📊 Dataset Explorer")
+st.markdown("Eksplorasi ulasan e-commerce dan anotasi **BILOU**.")
 
-st.markdown("""
-Halaman ini digunakan untuk mengeksplorasi dataset ulasan e-commerce
-yang telah dianotasi menggunakan skema **BILOU**
-(Begin, Inside, Last, Unit, Outside).
-""")
+df = st.session_state.df
 
-# ==========================================
-# PATH
-# ==========================================
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-train_path = os.path.join(ROOT_DIR, "data", "data_train_bilou.jsonl")
-val_path = os.path.join(ROOT_DIR, "data", "data_val_bilou.jsonl")
-test_path = os.path.join(ROOT_DIR, "data", "data_test_bilou.jsonl")
-
-label_path = os.path.join(ROOT_DIR, "data", "label_list.json")
-
-
-# ==========================================
-# LOAD DATASET
-# ==========================================
-@st.cache_data
-def load_dataset():
-
-    train_df = pd.read_json(train_path, lines=True)
-    val_df = pd.read_json(val_path, lines=True)
-    test_df = pd.read_json(test_path, lines=True)
-
-    train_df["split"] = "Train"
-    val_df["split"] = "Validation"
-    test_df["split"] = "Test"
-
-    return pd.concat(
-        [train_df, val_df, test_df],
-        ignore_index=True
-    )
-
-
-@st.cache_data
-def load_labels():
-    with open(label_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-df = load_dataset()
-label_list = load_labels()
-
-# ==========================================
-# DATASET OVERVIEW
-# ==========================================
-st.subheader("📈 Dataset Overview")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Total Data", len(df))
-
-with col2:
-    st.metric("Jumlah Kolom", len(df.columns))
-
-with col3:
-    st.metric("Jumlah Split", df["split"].nunique())
-
-with col4:
-    st.metric("Jumlah Label", len(label_list))
+col1, col2 = st.columns(2)
+col1.metric("Total Sampel", len(df))
+col2.metric("Jumlah Label Unik", len(st.session_state.labels))
 
 st.divider()
 
-# ==========================================
-# DISTRIBUSI DATASET
-# ==========================================
-st.subheader("📊 Distribusi Dataset")
+st.subheader("🔍 Telusuri Data")
 
-split_count = df["split"].value_counts()
+search_query = st.text_input("Cari kata dalam teks ulasan:")
+filtered_df = df
+if search_query:
+    filtered_df = df[df['tokens'].apply(lambda x: search_query.lower() in " ".join(x).lower())]
 
-col1, col2 = st.columns([2, 1])
+n_rows = st.slider("Jumlah sampel yang ditampilkan:", 5, 50, 10)
 
-with col1:
-    st.bar_chart(split_count)
+st.write(f"Menampilkan {min(n_rows, len(filtered_df))} data:")
 
-with col2:
-    st.dataframe(
-        split_count.reset_index().rename(
-            columns={
-                "index": "Split",
-                "count": "Jumlah"
-            }
-        ),
-        hide_index=True,
-        use_container_width=True
-    )
-
-st.divider()
-
-# ==========================================
-# SAMPLE DATA
-# ==========================================
-st.subheader("📝 Sample Data")
-
-preview_df = df.copy()
-
-if "tokens" in preview_df.columns:
-
-    preview_df["Teks"] = preview_df["tokens"].apply(
-        lambda x: " ".join(x[:25])
-        if isinstance(x, list)
-        else str(x)
-    )
-
-    display_cols = ["Teks", "split"]
-
-elif "sentence" in preview_df.columns:
-
-    display_cols = ["sentence", "split"]
-
-else:
-
-    display_cols = preview_df.columns.tolist()
-
-st.dataframe(
-    preview_df[display_cols].head(20),
-    hide_index=True,
-    use_container_width=True
-)
+for i, row in filtered_df.head(n_rows).iterrows():
+    with st.expander(f"Ulasan #{i+1}: {' '.join(row['tokens'][:10])}..."):
+        st.write("**Teks Lengkap:**")
+        st.text(" ".join(row['tokens']))
+        
+        st.write("**Anotasi BILOU:**")
+        cols = st.columns(len(row['tokens']))
+        for idx, (token, label) in enumerate(zip(row['tokens'], row['labels'])):
+            with cols[idx]:
+                st.caption(token)
+                st.code(label)
 
 st.divider()
 
-# ==========================================
-# CONTOH ANOTASI
-# ==========================================
-st.subheader("🏷️ Contoh Anotasi BILOU")
+st.subheader("🏷️ Distribusi Label")
+all_labels = [label for sublist in df['labels'] for label in sublist]
+label_counts = pd.Series(all_labels).value_counts()
 
-sample_size = min(5, len(df))
+st.bar_chart(label_counts)
 
-for i in range(sample_size):
-
-    row = df.iloc[i]
-
-    with st.container(border=True):
-
-        st.markdown(f"**Data #{i+1}**")
-
-        if "tokens" in row:
-            st.write("**Teks:**")
-            st.write(" ".join(row["tokens"]))
-
-        if "labels" in row:
-            st.write("**Label BILOU:**")
-            st.code(" | ".join(row["labels"]))
-
-        st.caption(f"Split: {row['split']}")
-
-st.divider()
-
-# ==========================================
-# LABEL INFORMATION
-# ==========================================
-st.subheader("📑 Label BILOU")
-
-prefix_counter = Counter()
-
-for label in label_list:
-
-    if label == "O":
-        prefix_counter["O"] += 1
-    else:
-        prefix = label.split("-")[0]
-        prefix_counter[prefix] += 1
-
-col1, col2 = st.columns([1, 2])
-
-with col1:
-
-    st.write("### Ringkasan Prefix")
-
-    prefix_df = pd.DataFrame({
-        "Prefix": list(prefix_counter.keys()),
-        "Jumlah": list(prefix_counter.values())
-    })
-
-    st.dataframe(
-        prefix_df,
-        hide_index=True,
-        use_container_width=True
-    )
-
-with col2:
-
-    st.write("### Seluruh Label")
-
-    label_df = pd.DataFrame({
-        "Label": label_list
-    })
-
-    st.dataframe(
-        label_df,
-        height=400,
-        hide_index=True,
-        use_container_width=True
-    )
-
-st.divider()
-
-# ==========================================
-# INFORMASI DATASET
-# ==========================================
-st.subheader("ℹ️ Informasi Dataset")
-
-train_count = (df["split"] == "Train").sum()
-val_count = (df["split"] == "Validation").sum()
-test_count = (df["split"] == "Test").sum()
-
-st.markdown(f"""
-- **Data Train** : {train_count:,}
-- **Data Validation** : {val_count:,}
-- **Data Test** : {test_count:,}
-- **Total Data** : {len(df):,}
-- **Jumlah Label BILOU** : {len(label_list):,}
-""")
+if st.checkbox("Lihat detail daftar label"):
+    st.write(st.session_state.labels)

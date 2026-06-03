@@ -10,11 +10,18 @@ st.title("Aspect-Based Sentiment Analysis (ABSA)")
 st.markdown("""
 ## Selamat Datang 👋
 
-Aplikasi ini digunakan untuk:
+Sistem ini digunakan untuk melakukan **Aspect-Based Sentiment Analysis (ABSA)**
+pada ulasan produk e-commerce berbahasa Indonesia.
 
-- Ekstraksi aspek dari ulasan e-commerce
-- Analisis sentimen berbasis aspek
-- Model terbaik: BiLSTM-CRF
+### Fitur Utama
+- Ekstraksi aspek secara otomatis
+- Identifikasi sentimen pada setiap aspek
+- Implementasi model terbaik BiLSTM-CRF
+- Eksplorasi dataset hasil anotasi
+
+### Halaman Tersedia
+- **Dataset Explorer**
+- **Prediction**
 
 Gunakan menu di sidebar untuk berpindah halaman.
 """)

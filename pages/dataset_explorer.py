@@ -38,7 +38,9 @@ col_a, col_b = st.columns(2)
 with col_a:
     st.subheader("📏 Distribusi Panjang Kalimat")
     df['seq_len'] = df[TOKEN_COL].apply(len)
-    st.histogram(df['seq_len'])
+    # Menghitung frekuensi agar kompatibel dengan bar_chart
+    len_counts = df['seq_len'].value_counts().sort_index()
+    st.bar_chart(len_counts)
 
 with col_b:
     st.subheader("🏷️ Filter berdasarkan Entitas")
@@ -64,20 +66,15 @@ n_rows = st.slider("Jumlah sampel:", 5, 50, 10)
 
 for i, row in filtered_df.head(n_rows).iterrows():
     with st.expander(f"Ulasan #{i+1}: {' '.join(row[TOKEN_COL][:10])}..."):
-        cols_per_row = 1 
         tokens = row[TOKEN_COL]
         labels = row[LABEL_COL]
         
-        for j in range(0, len(tokens), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for k in range(cols_per_row):
-                if j + k < len(tokens):
-                    with cols[k]:
-                        c1, c2 = st.columns([1, 3])
-                        with c1:
-                            st.caption(f"**{tokens[j+k]}**")
-                        with c2:
-                            st.text(labels[j+k])
+        for j in range(len(tokens)):
+            c1, c2 = st.columns([1, 3])
+            with c1:
+                st.caption(f"**{tokens[j]}**")
+            with c2:
+                st.text(labels[j])
 
 # --- DISTRIBUSI LABEL ---
 st.divider()

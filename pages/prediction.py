@@ -7,17 +7,20 @@ import torch
 import torch.nn as nn
 from torchcrf import CRF
 
-st.set_page_config(page_title="Prediction", layout="wide")
-
-# =========================
+# ==========================================
 # CONFIG
-# =========================
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ==========================================
+ROOT_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 
-# =========================
-# LOAD ARTIFACT
-# =========================
+DEVICE = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
+
+# ==========================================
+# LOAD FILES
+# ==========================================
 with open(os.path.join(ROOT_DIR, "vocab.pkl"), "rb") as f:
     vocab_w2i = pickle.load(f)
 
@@ -27,7 +30,11 @@ with open(os.path.join(ROOT_DIR, "tag2idx.pkl"), "rb") as f:
 with open(os.path.join(ROOT_DIR, "idx2tag.pkl"), "rb") as f:
     idx2tag = pickle.load(f)
 
-with open(os.path.join(ROOT_DIR, "metadata.json"), "r", encoding="utf-8") as f:
+with open(
+    os.path.join(ROOT_DIR, "metadata.json"),
+    "r",
+    encoding="utf-8"
+) as f:
     metadata = json.load(f)
 
 best_params = metadata["best_params"]
@@ -37,11 +44,18 @@ pretrained_embeddings = torch.load(
     map_location=DEVICE
 )
 
-# =========================
+# ==========================================
 # MODEL
-# =========================
+# ==========================================
 class BiLSTM_CRF_Model(nn.Module):
-    def __init__(self, vocab_size, hidden_dim, num_tags, pretrained_embeddings):
+
+    def __init__(
+        self,
+        vocab_size,
+        hidden_dim,
+        num_tags,
+        pretrained_embeddings
+    ):
         super().__init__()
 
         embedding_dim = pretrained_embeddings.size(1)
@@ -61,8 +75,15 @@ class BiLSTM_CRF_Model(nn.Module):
             bidirectional=True
         )
 
-        self.fc = nn.Linear(hidden_dim * 2, num_tags)
-        self.crf = CRF(num_tags, batch_first=True)
+        self.fc = nn.Linear(
+            hidden_dim * 2,
+            num_tags
+        )
+
+        self.crf = CRF(
+            num_tags,
+            batch_first=True
+        )
 
     def forward(self, x, mask):
         x = self.embedding(x)
@@ -72,14 +93,17 @@ class BiLSTM_CRF_Model(nn.Module):
 
     def decode(self, x, mask):
         emissions = self.forward(x, mask)
-        return self.crf.decode(emissions, mask=mask)
+        return self.crf.decode(
+            emissions,
+            mask=mask
+        )
 
-
-# =========================
-# CACHE MODEL (WAJIB)
-# =========================
+# ==========================================
+# LOAD MODEL
+# ==========================================
 @st.cache_resource
 def load_model():
+
     model = BiLSTM_CRF_Model(
         vocab_size=len(vocab_w2i),
         hidden_dim=best_params["hidden_dim"],
@@ -96,70 +120,100 @@ def load_model():
 
     model.to(DEVICE)
     model.eval()
-    return model
 
+    return model
 
 model = load_model()
 
-# =========================
+# ==========================================
 # PREPROCESS
-# =========================
+# ==========================================
 def preprocess_text(text):
+
     text = text.strip().lower()
+
     if not text:
         return []
 
-    tokens = re.findall(r"\w+|[^\w\s]", text, re.UNICODE)
-    return [t for t in tokens if t.strip()]
+    return re.findall(
+        r"\w+|[^\w\s]",
+        text,
+        re.UNICODE
+    )
 
-
-# =========================
+# ==========================================
 # PREDICT
-# =========================
+# ==========================================
 def predict(text):
+
     tokens = preprocess_text(text)
 
     if not tokens:
-        return [], [], []
+        return [], []
 
-    encoded = [vocab_w2i.get(t, vocab_w2i["[UNK]"]) for t in tokens]
+    encoded = [
+        vocab_w2i.get(
+            t,
+            vocab_w2i["[UNK]"]
+        )
+        for t in tokens
+    ]
 
-    x = torch.tensor([encoded], dtype=torch.long).to(DEVICE)
+    x = torch.tensor(
+        [encoded],
+        dtype=torch.long
+    ).to(DEVICE)
+
     mask = (x != 0)
 
     with torch.no_grad():
-        decoded = model.decode(x, mask)[0]
+        decoded = model.decode(
+            x,
+            mask
+        )[0]
 
-    labels = [idx2tag[i] for i in decoded]
+    labels = [
+        idx2tag[i]
+        for i in decoded
+    ]
 
     return tokens, labels
 
-
-# =========================
-# BILOU EXTRACTION
-# =========================
+# ==========================================
+# EXTRACT ENTITY
+# ==========================================
 def split_label(label):
+
     parts = label.split("_")
+
     if len(parts) == 1:
         return parts[0], "neutral"
+
     return "_".join(parts[:-1]), parts[-1]
 
-
 def extract(tokens, labels):
+
     results = []
+
     current_tokens = []
     current_entity = None
 
     for token, label in zip(tokens, labels):
 
         if label in ["O", "[PAD]"]:
+
             if current_tokens:
-                aspek, sentimen = split_label(current_entity)
+
+                aspek, sentimen = split_label(
+                    current_entity
+                )
+
                 results.append({
                     "frasa": " ".join(current_tokens),
                     "aspek": aspek,
                     "sentimen": sentimen
                 })
+
             current_tokens = []
             current_entity = None
             continue
@@ -170,7 +224,9 @@ def extract(tokens, labels):
         prefix, entity = label.split("-", 1)
 
         if prefix == "U":
+
             aspek, sentimen = split_label(entity)
+
             results.append({
                 "frasa": token,
                 "aspek": aspek,
@@ -178,62 +234,122 @@ def extract(tokens, labels):
             })
 
         elif prefix == "B":
+
             current_tokens = [token]
             current_entity = entity
 
         elif prefix in ["I", "L"]:
+
             current_tokens.append(token)
 
             if prefix == "L":
+
                 aspek, sentimen = split_label(entity)
+
                 results.append({
                     "frasa": " ".join(current_tokens),
                     "aspek": aspek,
                     "sentimen": sentimen
                 })
+
                 current_tokens = []
                 current_entity = None
 
     return results
 
-
-# =========================
+# ==========================================
 # UI
-# =========================
-st.title("Prediction - ABSA Model")
+# ==========================================
+st.title("🔮 Prediction")
+
+st.markdown("""
+Masukkan ulasan produk e-commerce untuk
+mendeteksi aspek dan sentimen menggunakan
+model **BiLSTM-CRF**.
+""")
 
 text = st.text_area(
-    "Input Review:",
-    placeholder="contoh: packing aman tapi pengiriman lambat"
+    "Input Review",
+    height=150,
+    placeholder="Contoh: packing aman tapi pengiriman lambat"
 )
 
+show_detail = st.checkbox(
+    "Tampilkan token-level output"
+)
 
 def display_results(data):
+
     if not data:
         st.warning("Tidak ada aspek terdeteksi.")
         return
 
-    st.subheader("Hasil Prediksi")
+    st.subheader("Hasil Analisis")
 
     cols = st.columns(3)
 
     for i, item in enumerate(data):
-        with cols[i % 3].container(border=True):
-            st.write(f"**Frasa:** {item['frasa']}")
-            st.write(f"**Aspek:** {item['aspek']}")
-            st.write(f"**Sentimen:** {item['sentimen']}")
 
+        sentimen = item["sentimen"].lower()
+
+        color_map = {
+            "positive": "green",
+            "negative": "red",
+            "neutral": "blue"
+        }
+
+        color = color_map.get(
+            sentimen,
+            "gray"
+        )
+
+        with cols[i % 3].container(border=True):
+
+            st.markdown(
+                f"**Frasa:** `{item['frasa']}`"
+            )
+
+            st.markdown(
+                f"**Aspek:** {item['aspek']}"
+            )
+
+            st.markdown(
+                f"**Sentimen:** :{color}[{sentimen.upper()}]"
+            )
 
 if st.button("Analisis"):
+
     if not text.strip():
-        st.warning("Masukkan teks dulu.")
+        st.warning("Masukkan teks terlebih dahulu.")
+
     else:
-        with st.spinner("Memproses..."):
+
+        with st.spinner("Memproses ulasan..."):
+
             tokens, labels = predict(text)
-            extracted = extract(tokens, labels)
+
+            extracted = extract(
+                tokens,
+                labels
+            )
 
         display_results(extracted)
 
-        st.divider()
-        st.subheader("Token Level")
-        st.table([{"Token": t, "Label": l} for t, l in zip(tokens, labels)])
+        if show_detail:
+
+            st.divider()
+
+            st.subheader(
+                "Token-Level Output"
+            )
+
+            st.table([
+                {
+                    "Token": t,
+                    "Label": l
+                }
+                for t, l in zip(
+                    tokens,
+                    labels
+                )
+            ])

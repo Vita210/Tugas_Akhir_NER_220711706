@@ -33,25 +33,20 @@ df = st.session_state.df
 TOKEN_COL = 'tokens'
 LABEL_COL = 'bilou_tags'
 
-# --- FUNGSI PEMBANTU: Ekstrak Kategori (Hapus prefix BILOU) ---
+# --- FUNGSI PEMBANTU ---
 def get_base_label(label):
     if label == 'O': return 'O'
-    # Mengambil bagian setelah '-' pertama, contoh: 'B-kualitas_positif' -> 'kualitas_positif'
     return label.split('-', 1)[1] if '-' in label else label
 
-# --- FITUR ANALISIS ---
-col_a, col_b = st.columns(2)
-with col_a:
-    st.subheader("📏 Distribusi Panjang Kalimat")
-    df['seq_len'] = df[TOKEN_COL].apply(len)
-    st.bar_chart(df['seq_len'].value_counts().sort_index())
+# --- FITUR ANALISIS (Sekarang Atas-Bawah) ---
+st.subheader("📏 Distribusi Panjang Kalimat")
+df['seq_len'] = df[TOKEN_COL].apply(len)
+st.bar_chart(df['seq_len'].value_counts().sort_index())
 
-with col_b:
-    st.subheader("🏷️ Filter Kategori Label")
-    # Mengambil list kategori unik (tanpa prefix B/I/L/U)
-    all_flat_labels = [get_base_label(l) for sublist in df[LABEL_COL] for l in sublist if l != 'O']
-    unique_categories = sorted(list(set(all_flat_labels)))
-    selected_categories = st.multiselect("Pilih kategori (tanpa tag BILOU):", unique_categories)
+st.subheader("🏷️ Filter Kategori Label")
+all_flat_labels = [get_base_label(l) for sublist in df[LABEL_COL] for l in sublist if l != 'O']
+unique_categories = sorted(list(set(all_flat_labels)))
+selected_categories = st.multiselect("Pilih kategori (tanpa tag BILOU):", unique_categories)
 
 # --- TELUSURI DATA ---
 st.divider()
@@ -63,7 +58,6 @@ if search_query:
     filtered_df = filtered_df[filtered_df[TOKEN_COL].apply(lambda x: search_query.lower() in " ".join(x).lower())]
 
 if selected_categories:
-    # Filter baris yang mengandung kategori yang dipilih
     mask = filtered_df[LABEL_COL].apply(
         lambda x: any(get_base_label(l) in selected_categories for l in x)
     )

@@ -1,59 +1,150 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-from utils.visualization import plot_label_distribution
-from utils.data_loader import load_data
+import pandas as pd
+import os
 
-st.set_page_config(page_title="Dataset Explorer", layout="wide")
-st.title("Dataset Explorer")
+st.title("📊 Dataset Explorer")
 
-if 'df' not in st.session_state:
-    st.session_state.df = load_data()
+st.markdown("""
+Halaman ini digunakan untuk mengeksplorasi dataset ulasan e-commerce
+yang telah dianotasi menggunakan skema **BILOU**
+(Begin, Inside, Last, Unit, Outside).
+""")
 
-# Access data from session state
-df = st.session_state.df
+# ==========================================
+# LOAD DATASET
+# ==========================================
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Show basic dataset info
-st.subheader("Dataset Overview")
-st.write(f"Number of samples: {df.shape[0]}")
-st.write(f"Number of features: {df.shape[1]}")
+train_path = os.path.join(ROOT_DIR, "data", "data_train_bilou.jsonl")
+val_path = os.path.join(ROOT_DIR, "data", "data_val_bilou.jsonl")
+test_path = os.path.join(ROOT_DIR, "data", "data_test_bilou.jsonl")
 
-# Display sample data
-st.subheader("Sample Data")
-st.dataframe(df.head())
 
-# Show label distribution
-st.subheader("Label Distribution")
-cols = st.columns(3)
+@st.cache_data
+def load_dataset():
+    train_df = pd.read_json(train_path, lines=True)
+    val_df = pd.read_json(val_path, lines=True)
+    test_df = pd.read_json(test_path, lines=True)
 
-for i, column in enumerate(['fuel', 'machine', 'part']):
-    with cols[i % 3]:
-        fig = plot_label_distribution(df, column)
-        st.pyplot(fig)
+    train_df["split"] = "Train"
+    val_df["split"] = "Validation"
+    test_df["split"] = "Test"
 
-# Sample sentences per sentiment
-st.subheader("Sample Sentences by Sentiment")
+    return pd.concat(
+        [train_df, val_df, test_df],
+        ignore_index=True
+    )
 
-# Select sentiment to explore
-sentiment_to_explore = st.selectbox(
-    "Choose sentiment to explore:",
-    ["fuel", "machine", "part"]
-)
 
-# Display examples for each sentiment value
-st.write(f"### {sentiment_to_explore.capitalize()} Sentiment Examples")
+df = load_dataset()
+
+# ==========================================
+# OVERVIEW
+# ==========================================
+st.subheader("📈 Dataset Overview")
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.write("#### Negative")
-    for _, row in df[df[sentiment_to_explore] == 'negative'].head(3).iterrows():
-        st.write(f"- {row['Sentence']}")
+    st.metric("Total Data", len(df))
 
 with col2:
-    st.write("#### Neutral")
-    for _, row in df[df[sentiment_to_explore] == 'neutral'].head(3).iterrows():
-        st.write(f"- {row['Sentence']}")
+    st.metric("Jumlah Kolom", len(df.columns))
 
 with col3:
-    st.write("#### Positive")
-    for _, row in df[df[sentiment_to_explore] == 'positive'].head(3).iterrows():
-        st.write(f"- {row['Sentence']}")
+    st.metric("Jumlah Split", df["split"].nunique())
+
+st.divider()
+
+# ==========================================
+# DISTRIBUSI DATASET
+# ==========================================
+st.subheader("📊 Distribusi Dataset")
+
+split_count = df["split"].value_counts()
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.bar_chart(split_count)
+
+with col2:
+    st.dataframe(
+        split_count.reset_index().rename(
+            columns={"index": "Split", "split": "Jumlah"}
+        ),
+        use_container_width=True
+    )
+
+st.divider()
+
+# ==========================================
+# SAMPLE DATA (RINGKAS)
+# ==========================================
+st.subheader("📝 Sample Data")
+
+preview_df = df.copy()
+
+# Jika ada kolom tokens
+if "tokens" in preview_df.columns:
+    preview_df["text"] = preview_df["tokens"].apply(
+        lambda x: " ".join(x[:20]) if isinstance(x, list) else str(x)
+    )
+
+    display_cols = ["text", "split"]
+
+elif "sentence" in preview_df.columns:
+    display_cols = ["sentence", "split"]
+
+else:
+    display_cols = preview_df.columns.tolist()
+
+st.dataframe(
+    preview_df[display_cols].head(20),
+    use_container_width=True
+)
+
+st.divider()
+
+# ==========================================
+# CONTOH ANOTASI
+# ==========================================
+st.subheader("🏷️ Contoh Anotasi BILOU")
+
+sample_size = min(5, len(df))
+
+for i in range(sample_size):
+
+    row = df.iloc[i]
+
+    with st.container(border=True):
+
+        st.markdown(f"**Data #{i+1}**")
+
+        if "tokens" in row:
+            st.write("**Teks:**")
+            st.write(" ".join(row["tokens"]))
+
+        if "labels" in row:
+            st.write("**Label BILOU:**")
+            st.code(" | ".join(row["labels"]))
+
+        st.caption(f"Split: {row['split']}")
+
+st.divider()
+
+# ==========================================
+# INFORMASI DATASET
+# ==========================================
+st.subheader("ℹ️ Informasi Dataset")
+
+train_count = (df["split"] == "Train").sum()
+val_count = (df["split"] == "Validation").sum()
+test_count = (df["split"] == "Test").sum()
+
+st.write(f"""
+- Data Train : **{train_count:,}**
+- Data Validation : **{val_count:,}**
+- Data Test : **{test_count:,}**
+- Total Data : **{len(df):,}**
+""")

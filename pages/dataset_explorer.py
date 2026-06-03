@@ -33,33 +33,40 @@ df = st.session_state.df
 TOKEN_COL = 'tokens'
 LABEL_COL = 'bilou_tags'
 
-# --- FITUR ANALISIS BARU: STATISTIK ---
+# --- FUNGSI PEMBANTU: Ekstrak Kategori (Hapus prefix BILOU) ---
+def get_base_label(label):
+    if label == 'O': return 'O'
+    # Mengambil bagian setelah '-' pertama, contoh: 'B-kualitas_positif' -> 'kualitas_positif'
+    return label.split('-', 1)[1] if '-' in label else label
+
+# --- FITUR ANALISIS ---
 col_a, col_b = st.columns(2)
 with col_a:
     st.subheader("📏 Distribusi Panjang Kalimat")
     df['seq_len'] = df[TOKEN_COL].apply(len)
-    # Menghitung frekuensi agar kompatibel dengan bar_chart
-    len_counts = df['seq_len'].value_counts().sort_index()
-    st.bar_chart(len_counts)
+    st.bar_chart(df['seq_len'].value_counts().sort_index())
 
 with col_b:
-    st.subheader("🏷️ Filter berdasarkan Entitas")
-    all_flat_labels = [l for sublist in df[LABEL_COL] for l in sublist if l != 'O']
-    unique_labels = sorted(list(set(all_flat_labels)))
-    selected_labels = st.multiselect("Pilih label untuk difilter:", unique_labels)
+    st.subheader("🏷️ Filter Kategori Label")
+    # Mengambil list kategori unik (tanpa prefix B/I/L/U)
+    all_flat_labels = [get_base_label(l) for sublist in df[LABEL_COL] for l in sublist if l != 'O']
+    unique_categories = sorted(list(set(all_flat_labels)))
+    selected_categories = st.multiselect("Pilih kategori (tanpa tag BILOU):", unique_categories)
 
 # --- TELUSURI DATA ---
 st.divider()
 st.subheader("🔍 Telusuri Data")
 
-# Filter gabungan (Pencarian teks + Filter label)
 filtered_df = df
 search_query = st.text_input("Cari kata dalam teks ulasan:")
 if search_query:
     filtered_df = filtered_df[filtered_df[TOKEN_COL].apply(lambda x: search_query.lower() in " ".join(x).lower())]
 
-if selected_labels:
-    mask = filtered_df[LABEL_COL].apply(lambda x: any(l in selected_labels for l in x))
+if selected_categories:
+    # Filter baris yang mengandung kategori yang dipilih
+    mask = filtered_df[LABEL_COL].apply(
+        lambda x: any(get_base_label(l) in selected_categories for l in x)
+    )
     filtered_df = filtered_df[mask]
 
 n_rows = st.slider("Jumlah sampel:", 5, 50, 10)
@@ -78,6 +85,6 @@ for i, row in filtered_df.head(n_rows).iterrows():
 
 # --- DISTRIBUSI LABEL ---
 st.divider()
-st.subheader("🏷️ Distribusi Label (Tanpa 'O')")
+st.subheader("🏷️ Distribusi Label")
 if all_flat_labels:
     st.bar_chart(pd.Series(all_flat_labels).value_counts())

@@ -60,12 +60,27 @@ st.divider()
 # ==========================================
 st.subheader("Sample Data")
 
-st.dataframe(
-    df.head(20),
-    use_container_width=True
-)
+sample_df = df.head(10).copy()
 
-st.divider()
+if "tokens" in sample_df.columns:
+    sample_df["tokens"] = sample_df["tokens"].apply(
+        lambda x: " ".join(x[:15]) + " ..."
+        if isinstance(x, list) and len(x) > 15
+        else " ".join(x) if isinstance(x, list) else x
+    )
+
+if "labels" in sample_df.columns:
+    sample_df["labels"] = sample_df["labels"].apply(
+        lambda x: ", ".join(x[:10]) + " ..."
+        if isinstance(x, list) and len(x) > 10
+        else ", ".join(x) if isinstance(x, list) else x
+    )
+
+st.dataframe(
+    sample_df,
+    use_container_width=True,
+    hide_index=True
+)
 
 # ==========================================
 # DISTRIBUSI SPLIT

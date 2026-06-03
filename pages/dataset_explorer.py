@@ -19,11 +19,8 @@ def load_data():
     
     df = pd.concat(df_list, ignore_index=True)
     
-    # Cek label_list.json
-    labels = []
-    if os.path.exists(LABEL_PATH):
-        with open(LABEL_PATH, "r", encoding="utf-8") as f:
-            labels = json.load(f)
+    with open(LABEL_PATH, "r", encoding="utf-8") as f:
+        labels = json.load(f)
     return df, labels
 
 if 'df' not in st.session_state or 'labels' not in st.session_state:
@@ -32,16 +29,9 @@ if 'df' not in st.session_state or 'labels' not in st.session_state:
 st.title("📊 Dataset Explorer")
 df = st.session_state.df
 
-# DEBUG: Tampilkan nama kolom jika error
-st.sidebar.write("Kolom yang tersedia:", df.columns.tolist())
-
-# Deteksi nama kolom secara otomatis
-token_col = next((c for c in ['tokens', 'text', 'sentence'] if c in df.columns), None)
-label_col = next((c for c in ['labels', 'tags', 'tag', 'ner_tags'] if c in df.columns), None)
-
-if not token_col or not label_col:
-    st.error(f"Gagal mendeteksi kolom! Kolom ditemukan: {df.columns.tolist()}. Pastikan data memiliki kolom untuk token dan label.")
-    st.stop()
+# Nama kolom spesifik berdasarkan hasil deteksi Anda
+TOKEN_COL = 'tokens'
+LABEL_COL = 'bilou_tags'
 
 col1, col2 = st.columns(2)
 col1.metric("Total Sampel", len(df))
@@ -49,26 +39,27 @@ col2.metric("Jumlah Label Unik", len(st.session_state.labels))
 
 st.divider()
 
+st.subheader("🔍 Telusuri Data")
 search_query = st.text_input("Cari kata dalam teks ulasan:")
 filtered_df = df
 if search_query:
-    filtered_df = df[df[token_col].apply(lambda x: search_query.lower() in " ".join(x).lower())]
+    filtered_df = df[df[TOKEN_COL].apply(lambda x: search_query.lower() in " ".join(x).lower())]
 
 n_rows = st.slider("Jumlah sampel yang ditampilkan:", 5, 50, 10)
 
 for i, row in filtered_df.head(n_rows).iterrows():
-    with st.expander(f"Ulasan #{i+1}: {' '.join(row[token_col][:10])}..."):
+    with st.expander(f"Ulasan #{i+1}: {' '.join(row[TOKEN_COL][:10])}..."):
         st.write("**Teks Lengkap:**")
-        st.text(" ".join(row[token_col]))
+        st.text(" ".join(row[TOKEN_COL]))
         
         st.write("**Anotasi BILOU:**")
-        cols = st.columns(len(row[token_col]))
-        for idx, (token, label) in enumerate(zip(row[token_col], row[label_col])):
+        cols = st.columns(len(row[TOKEN_COL]))
+        for idx, (token, label) in enumerate(zip(row[TOKEN_COL], row[LABEL_COL])):
             with cols[idx]:
                 st.caption(token)
                 st.code(label)
 
 st.divider()
 st.subheader("🏷️ Distribusi Label")
-all_labels = [label for sublist in df[label_col] for label in sublist]
+all_labels = [label for sublist in df[LABEL_COL] for label in sublist]
 st.bar_chart(pd.Series(all_labels).value_counts())

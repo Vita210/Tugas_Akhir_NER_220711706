@@ -60,6 +60,9 @@ for i, row in filtered_df.head(n_rows).iterrows():
                 st.code(label)
 
 st.divider()
-st.subheader("🏷️ Distribusi Label")
-all_labels = [label for sublist in df[LABEL_COL] for label in sublist]
-st.bar_chart(pd.Series(all_labels).value_counts())
+st.subheader("🏷️ Distribusi Label (Tanpa 'O')")
+all_labels = [label for sublist in df[LABEL_COL] for label in sublist if label != 'O']
+if all_labels:
+    st.bar_chart(pd.Series(all_labels).value_counts())
+else:
+    st.write("Tidak ada label selain 'O' dalam dataset.")

@@ -3,3 +3,4 @@ torch
 torchcrf
 numpy
 pytorch-crf
+matplotlib
